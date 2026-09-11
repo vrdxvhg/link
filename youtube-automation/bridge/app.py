@@ -1,0 +1,96 @@
+"""Minimal local-first HTTP bridge for JARVIS V2 YouTube Automation."""
+from __future__ import annotations
+import os
+import re
+from pathlib import Path
+from urllib.parse import quote
+from flask import Flask, jsonify, request, send_file
+
+MAX_UPLOAD_BYTES = int(os.getenv("JARVIS_MAX_UPLOAD_BYTES", str(2 * 1024 * 1024 * 1024)))
+WORKSPACE = Path(os.getenv("JARVIS_WORKSPACE", "workspace/uploads")).resolve()
+TOKEN = os.getenv("JARVIS_BRIDGE_TOKEN", "")
+NAME_RE = re.compile(r"[^A-Za-z0-9._ -]")
+app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
+WORKSPACE.mkdir(parents=True, exist_ok=True)
+
+
+def authorized() -> bool:
+    return not TOKEN or request.headers.get("Authorization", "") == f"Bearer {TOKEN}"
+
+
+def safe_name(name: str) -> str:
+    cleaned = NAME_RE.sub("_", Path(name).name).strip(" .")
+    if not cleaned:
+        raise ValueError("invalid filename")
+    return cleaned[:180]
+
+
+def files() -> list[Path]:
+    return sorted((p for p in WORKSPACE.iterdir() if p.is_file()), key=lambda p: p.name.lower())
+
+
+@app.before_request
+def auth_gate():
+    if request.path == "/health":
+        return None
+    if not authorized():
+        return jsonify({"error": "unauthorized"}), 401
+    return None
+
+
+@app.get("/health")
+def health():
+    return jsonify({"ok": True, "service": "jarvis-v2-bridge", "workspace": str(WORKSPACE)})
+
+
+@app.post("/api/v1/files/upload")
+def upload():
+    if "file" not in request.files:
+        return jsonify({"error": "multipart field 'file' is required"}), 400
+    incoming = request.files["file"]
+    try:
+        name = safe_name(incoming.filename or "")
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    target = WORKSPACE / name
+    stem, suffix = target.stem, target.suffix
+    index = 1
+    while target.exists():
+        target = WORKSPACE / f"{stem}_{index}{suffix}"
+        index += 1
+    incoming.save(target)
+    return jsonify({"id": target.name, "name": target.name, "size": target.stat().st_size, "download": f"/api/v1/files/{quote(target.name)}/download"}), 201
+
+
+@app.get("/api/v1/files")
+def list_files():
+    return jsonify({"files": [{"id": p.name, "name": p.name, "size": p.stat().st_size} for p in files()]})
+
+
+@app.get("/api/v1/files/<path:file_id>")
+def file_info(file_id: str):
+    try:
+        name = safe_name(file_id)
+    except ValueError:
+        return jsonify({"error": "invalid file id"}), 400
+    path = (WORKSPACE / name).resolve()
+    if path.parent != WORKSPACE or not path.is_file():
+        return jsonify({"error": "file not found"}), 404
+    return jsonify({"id": name, "name": name, "size": path.stat().st_size, "download": f"/api/v1/files/{quote(name)}/download"})
+
+
+@app.get("/api/v1/files/<path:file_id>/download")
+def download(file_id: str):
+    try:
+        name = safe_name(file_id)
+    except ValueError:
+        return jsonify({"error": "invalid file id"}), 400
+    path = (WORKSPACE / name).resolve()
+    if path.parent != WORKSPACE or not path.is_file():
+        return jsonify({"error": "file not found"}), 404
+    return send_file(path, as_attachment=True, download_name=path.name)
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.getenv("JARVIS_BRIDGE_PORT", "8787")))
