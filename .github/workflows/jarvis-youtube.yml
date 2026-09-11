@@ -1,0 +1,21 @@
+name: JARVIS YouTube Automation
+
+on:
+  push:
+    paths:
+      - 'youtube-automation/**'
+      - '.github/workflows/jarvis-youtube.yml'
+  pull_request:
+    paths:
+      - 'youtube-automation/**'
+      - '.github/workflows/jarvis-youtube.yml'
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m compileall youtube-automation
