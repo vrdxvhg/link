@@ -5,6 +5,10 @@ import re
 from pathlib import Path
 from urllib.parse import quote
 from flask import Flask, jsonify, request, send_file
+try:
+    from .jobs import create_job, get_job, update_job
+except ImportError:
+    from jobs import create_job, get_job, update_job
 
 MAX_UPLOAD_BYTES = int(os.getenv("JARVIS_MAX_UPLOAD_BYTES", str(2 * 1024 * 1024 * 1024)))
 WORKSPACE = Path(os.getenv("JARVIS_WORKSPACE", "workspace/uploads")).resolve()
@@ -90,6 +94,34 @@ def download(file_id: str):
     if path.parent != WORKSPACE or not path.is_file():
         return jsonify({"error": "file not found"}), 404
     return send_file(path, as_attachment=True, download_name=path.name)
+
+
+@app.post("/api/v1/jobs")
+def create_job_route():
+    data = request.get_json(silent=True) or {}
+    kind = str(data.get("kind", "song_to_youtube")).strip()
+    payload = data.get("payload") or {}
+    if not kind or not isinstance(payload, dict):
+        return jsonify({"error": "kind and object payload are required"}), 400
+    return jsonify(create_job(kind, payload)), 201
+
+
+@app.get("/api/v1/jobs/<job_id>")
+def get_job_route(job_id: str):
+    job = get_job(job_id)
+    return jsonify(job) if job else (jsonify({"error": "job not found"}), 404)
+
+
+@app.post("/api/v1/jobs/<job_id>/status")
+def update_job_route(job_id: str):
+    data = request.get_json(silent=True) or {}
+    status = str(data.get("status", "")).strip()
+    if status not in {"queued", "running", "completed", "failed", "awaiting_approval"}:
+        return jsonify({"error": "invalid status"}), 400
+    try:
+        return jsonify(update_job(job_id, status=status)), 200
+    except FileNotFoundError:
+        return jsonify({"error": "job not found"}), 404
 
 
 if __name__ == "__main__":
