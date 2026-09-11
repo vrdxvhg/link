@@ -9,23 +9,25 @@ from typing import Optional
 
 try:
     from .speech_listener import SpeechListener
+    from .voice_vad import is_speech
 except ImportError:
     from speech_listener import SpeechListener
+    from voice_vad import is_speech
 
 
 class MicrophoneListener:
-    def __init__(self, listener: Optional[SpeechListener] = None):
+    def __init__(self, listener: Optional[SpeechListener] = None, vad_threshold: float = 350.0):
         self.listener = listener or SpeechListener()
+        self.vad_threshold = vad_threshold
         self.running = False
 
-    def listen_once(self) -> str:
+    def listen_once(self) -> Optional[str]:
         try:
             import numpy as np
             import sounddevice as sd
         except ImportError as exc:
             raise RuntimeError(
-                "Optional microphone dependencies missing: install "
-                "sounddevice and numpy."
+                "Optional microphone dependencies missing: install sounddevice and numpy."
             ) from exc
 
         frames = int(self.listener.config.sample_rate * self.listener.config.chunk_seconds)
@@ -36,6 +38,10 @@ class MicrophoneListener:
             dtype="int16",
         )
         sd.wait()
+
+        samples = audio.reshape(-1).tolist()
+        if not is_speech(samples, self.vad_threshold):
+            return None
 
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
             wav_path = Path(tmp.name)
@@ -62,7 +68,6 @@ class MicrophoneListener:
 
 
 def main() -> None:
-    """Run the microphone adapter until interrupted or deactivated."""
     listener = MicrophoneListener()
     try:
         listener.run()
