@@ -1,26 +1,44 @@
-"""Background song-to-YouTube job runner for JARVIS V2."""
+"""Background worker that executes JARVIS V2 song-to-YouTube jobs locally."""
 from __future__ import annotations
 import threading
-from pathlib import Path
 from typing import Any
-
 try:
-    from .jobs import update_job
+    from .jobs import get_job, update_job
 except ImportError:
-    from jobs import update_job
+    from jobs import get_job, update_job
 try:
     from ..core.song_factory import build_song_project
 except ImportError:
     from youtube_automation.core.song_factory import build_song_project
 
 
-def run_song_job(job_id: str, audio_path: str, output_dir: str = "workspace/projects", bpm: float = 120.0, mood: str = "cinematic") -> None:
+def run_job(job_id: str) -> dict:
+    job = get_job(job_id)
+    if not job:
+        raise FileNotFoundError(job_id)
+    update_job(job_id, status="running")
     try:
-        update_job(job_id, status="running")
-        manifest = build_song_project(audio_path, output_dir=output_dir, bpm=bpm, mood=mood)
-        update_job(job_id, status="completed", result=manifest)
+        payload = job.get("payload", {})
+        audio_path = payload.get("audio_path") or payload.get("file_path")
+        if not audio_path:
+            raise ValueError("payload.audio_path is required")
+        manifest = build_song_project(audio_path, output_dir=payload.get("output_dir", "workspace/projects"), bpm=float(payload.get("bpm", 120.0)), mood=str(payload.get("mood", "cinematic")))
+        return update_job(job_id, status="awaiting_approval", result=manifest)
     except Exception as exc:
-        update_job(job_id, status="failed", error=f"{type(exc).__name__}: {exc}")
+        return update_job(job_id, status="failed", error=f"{type(exc).__name__}: {exc}")
+
+
+def submit_job(job_id: str) -> threading.Thread:
+    thread = threading.Thread(target=run_job, args=(job_id,), name=f"jarvis-job-{job_id[:8]}", daemon=True)
+    thread.start()
+    return thread
+
+
+def run_song_job(job_id: str, audio_path: str, output_dir: str = "workspace/projects", bpm: float = 120.0, mood: str = "cinematic") -> None:
+    payload = {"audio_path": audio_path, "output_dir": output_dir, "bpm": bpm, "mood": mood}
+    from .jobs import update_job as _update_job
+    _update_job(job_id, payload=payload)
+    run_job(job_id)
 
 
 def start_song_job(job_id: str, audio_path: str, **options: Any) -> threading.Thread:
