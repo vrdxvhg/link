@@ -9,7 +9,9 @@ def test_job_lifecycle(tmp_path, monkeypatch):
     assert get_job(job["id"])["kind"] == "song_to_youtube"
     updated = update_job(job["id"], status="running")
     assert updated["status"] == "running"
+    assert get_job(job["id"])["status"] == "running"
 
 
 if __name__ == "__main__":
+    test_job_lifecycle(type("Tmp", (), {})(), None)
     print("bridge job tests: PASS")
