@@ -13,5 +13,4 @@ def test_job_lifecycle(tmp_path, monkeypatch):
 
 
 if __name__ == "__main__":
-    test_job_lifecycle(type("Tmp", (), {})(), None)
-    print("bridge job tests: PASS")
+    print("Run with pytest: python -m pytest test_jobs.py")
