@@ -1,8 +1,4 @@
-"""Live microphone adapter for JARVIS V2.
-
-Optional runtime layer: sounddevice captures short WAV chunks and
-SpeechListener transcribes them locally with faster-whisper.
-"""
+"""Live microphone adapter for JARVIS V2."""
 
 from __future__ import annotations
 
@@ -11,7 +7,10 @@ import wave
 from pathlib import Path
 from typing import Optional
 
-from speech_listener import SpeechListener
+try:
+    from .speech_listener import SpeechListener
+except ImportError:
+    from speech_listener import SpeechListener
 
 
 class MicrophoneListener:
@@ -60,3 +59,17 @@ class MicrophoneListener:
 
     def stop(self) -> None:
         self.running = False
+
+
+def main() -> None:
+    """Run the microphone adapter until interrupted or deactivated."""
+    listener = MicrophoneListener()
+    try:
+        listener.run()
+    except KeyboardInterrupt:
+        listener.stop()
+        print("Microphone listener stopped.")
+
+
+if __name__ == "__main__":
+    main()
