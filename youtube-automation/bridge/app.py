@@ -7,8 +7,10 @@ from urllib.parse import quote
 from flask import Flask, jsonify, request, send_file
 try:
     from .jobs import create_job, get_job, update_job
+    from .worker import submit_job
 except ImportError:
     from jobs import create_job, get_job, update_job
+    from worker import submit_job
 
 MAX_UPLOAD_BYTES = int(os.getenv("JARVIS_MAX_UPLOAD_BYTES", str(2 * 1024 * 1024 * 1024)))
 WORKSPACE = Path(os.getenv("JARVIS_WORKSPACE", "workspace/uploads")).resolve()
@@ -103,7 +105,10 @@ def create_job_route():
     payload = data.get("payload") or {}
     if not kind or not isinstance(payload, dict):
         return jsonify({"error": "kind and object payload are required"}), 400
-    return jsonify(create_job(kind, payload)), 201
+    job = create_job(kind, payload)
+    if kind == "song_to_youtube" and (payload.get("audio_path") or payload.get("file_path")):
+        submit_job(job["id"])
+    return jsonify(job), 201
 
 
 @app.get("/api/v1/jobs/<job_id>")
