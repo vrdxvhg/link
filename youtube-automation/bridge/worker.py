@@ -7,9 +7,9 @@ try:
 except ImportError:
     from jobs import get_job, update_job
 try:
-    from ..core.song_factory import build_song_project
+    from ..core.pipeline_runner import run_pipeline
 except ImportError:
-    from youtube_automation.core.song_factory import build_song_project
+    from youtube_automation.core.pipeline_runner import run_pipeline
 
 
 def run_job(job_id: str) -> dict:
@@ -22,7 +22,13 @@ def run_job(job_id: str) -> dict:
         audio_path = payload.get("audio_path") or payload.get("file_path")
         if not audio_path:
             raise ValueError("payload.audio_path is required")
-        manifest = build_song_project(audio_path, output_dir=payload.get("output_dir", "workspace/projects"), bpm=float(payload.get("bpm", 120.0)), mood=str(payload.get("mood", "cinematic")))
+        manifest = run_pipeline(
+            audio_path,
+            output_dir=payload.get("output_dir", "workspace/projects"),
+            bpm=float(payload.get("bpm", 120.0)),
+            mood=str(payload.get("mood", "cinematic")),
+            title=payload.get("title"),
+        )
         return update_job(job_id, status="awaiting_approval", result=manifest)
     except Exception as exc:
         return update_job(job_id, status="failed", error=f"{type(exc).__name__}: {exc}")
@@ -34,10 +40,9 @@ def submit_job(job_id: str) -> threading.Thread:
     return thread
 
 
-def run_song_job(job_id: str, audio_path: str, output_dir: str = "workspace/projects", bpm: float = 120.0, mood: str = "cinematic") -> None:
-    payload = {"audio_path": audio_path, "output_dir": output_dir, "bpm": bpm, "mood": mood}
-    from .jobs import update_job as _update_job
-    _update_job(job_id, payload=payload)
+def run_song_job(job_id: str, audio_path: str, output_dir: str = "workspace/projects", bpm: float = 120.0, mood: str = "cinematic", title: str | None = None) -> None:
+    payload = {"audio_path": audio_path, "output_dir": output_dir, "bpm": bpm, "mood": mood, "title": title}
+    update_job(job_id, payload=payload)
     run_job(job_id)
 
 
