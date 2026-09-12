@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>JARVIS V2 — eDEX VRM Center Prototype</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main id="edex-shell" aria-label="JARVIS V2 eDEX shell">
+    <section class="hud hud-left"><pre id="telemetry">SYSTEM// ONLINE\nVOICE// LISTENING\nVRM// READY\nLINK// LOCAL</pre></section>
+    <section class="center-slot" aria-label="Central VRM display">
+      <canvas id="vrm-canvas"></canvas>
+      <div id="vrm-status">VRM INITIALIZING…</div>
+    </section>
+    <section class="hud hud-right"><pre id="runtime">CPU  00%\nRAM  00%\nGPU  00%\nNET  LOCAL\nJOBS 00</pre></section>
+  </main>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.177.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.177.0/examples/jsm/",
+      "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.4.0/lib/three-vrm.module.js"
+    }
+  }
+  </script>
+  <script type="module" src="./vrm_adapter.js"></script>
+</body>
+</html>
