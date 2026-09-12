@@ -18,6 +18,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Install bridge test dependencies
+        run: python -m pip install --disable-pip-version-check 'flask>=3.0,<4' 'pytest>=8,<9'
       - name: Compile project
         run: python -m compileall youtube-automation
       - name: Run core state tests
@@ -26,4 +28,8 @@ jobs:
           python voice_control_test.py
           python runtime_test.py
           python speech_listener_test.py
+          python ui_runtime_test.py
           python runtime_cli.py "I am Vikas" "lock" "I am Vikas"
+      - name: Run bridge UI contract tests
+        working-directory: youtube-automation
+        run: python -m pytest -q bridge/ui_route_test.py
