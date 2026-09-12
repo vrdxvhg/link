@@ -53,6 +53,12 @@ Shutdown/deactivation affects only the voice-listening/UI interaction layer. It 
 - `youtube-automation/core/runtime.py`
 - `youtube-automation/core/runtime_test.py`
 - `youtube-automation/core/runtime_cli.py`
+- `youtube-automation/core/jarvis_runtime.py` (compatibility shim to canonical runtime)
+- `youtube-automation/core/microphone_listener.py`
+- `youtube-automation/core/voice_vad.py`
+- `youtube-automation/core/approval_gate.py`
+- `youtube-automation/core/youtube_adapter.py`
+- `youtube-automation/core/youtube_browser_adapter.py`
 - `youtube-automation/core/__init__.py`
 - `youtube-automation/core/README.md`
 - `youtube-automation/core/VOICE_CONTROL.md`
@@ -61,9 +67,9 @@ Shutdown/deactivation affects only the voice-listening/UI interaction layer. It 
 
 ## Runtime / microphone status
 
-Live microphone capture is now implemented in `speech_listener.py` using lazy `sounddevice` capture, temporary WAV chunks, and local `faster-whisper` transcription. `runtime.py` owns the microphone thread and keeps the backend alive when listening is disabled.
+Live microphone capture is implemented in `speech_listener.py` using lazy `sounddevice` capture, temporary WAV chunks, and local `faster-whisper` transcription. `runtime.py` owns the microphone thread and keeps the backend alive when listening is disabled.
 
-Hardware-free tests cover the runtime state machine, microphone thread lifecycle, and one captured/transcribed microphone chunk. `runtime_cli.py` provides a small command-line smoke/demo entry point.
+Hardware-free tests cover the runtime state machine, microphone thread lifecycle, and one captured/transcribed microphone chunk. `runtime_cli.py` provides a command-line smoke/demo entry point. The legacy `jarvis_runtime.py` entry point now delegates to `runtime.py` so there is one canonical runtime implementation.
 
 The microphone stack remains optional: the core runtime can start without `sounddevice`/`faster-whisper`; live capture reports a dependency error only when explicitly started.
 
@@ -73,14 +79,16 @@ The local Bridge exposes health, authenticated file upload/list/download, asynch
 
 The current FFmpeg renderer is an MVP adapter: it produces a 1920×1080 H.264/AAC video with a mood-dependent cinematic background, subtle zoom and vignette. It is intentionally a replaceable rendering layer for the future 3D/VRM scene renderer.
 
+The YouTube Studio layer already has a core publish state machine plus browser-adapter contract/dry-run implementation. A production browser driver still needs live Studio verification.
+
 ## Remaining execution order
 
-1. Run/verify the Python tests and CI path on the repository environment.
-2. Harden Bridge API tests and job/approval state handling.
+1. Verify the latest CI run and fix any environment/import failures.
+2. Harden Bridge API/job tests and approval-state transitions.
 3. Add the UI listening/locked status adapter while preserving the locked eDEX-UI visual foundation.
 4. Replace/extend the FFmpeg MVP with the real song-driven 3D/VRM scene pipeline once the exact UI/visual source is available.
 5. Audit the uploaded source-library projects and extract only useful modules.
-6. Implement the YouTube Studio adapter separately from the core state machine.
+6. Verify/attach the production YouTube Studio browser driver against the live Studio UI.
 7. Keep final publishing behind the approval gate.
 
 ## UI lock
