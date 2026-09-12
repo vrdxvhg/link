@@ -18,4 +18,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: python -m compileall youtube-automation
+      - name: Compile project
+        run: python -m compileall youtube-automation
+      - name: Run core state tests
+        working-directory: youtube-automation/core
+        run: |
+          python voice_control_test.py
+          python runtime_test.py
