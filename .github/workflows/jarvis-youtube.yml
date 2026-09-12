@@ -25,3 +25,5 @@ jobs:
         run: |
           python voice_control_test.py
           python runtime_test.py
+          python speech_listener_test.py
+          python runtime_cli.py "I am Vikas" "lock" "I am Vikas"
