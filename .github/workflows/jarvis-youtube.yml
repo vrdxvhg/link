@@ -35,6 +35,7 @@ jobs:
         run: |
           python shorts_media_adapters_test.py
           python render_engine_test.py
+          pytest -q scene_planner_test.py
       - name: Run bridge UI contract tests
         working-directory: youtube-automation
         run: python -m pytest -q bridge/ui_route_test.py
