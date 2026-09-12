@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JARVIS V2 — eDEX + 4D VRM</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="edex-shell" aria-label="JARVIS V2 eDEX shell">
+    <section class="panel panel-left">
+      <header>FILESYSTEM</header>
+      <pre id="file-tree">/workspace
+├─ uploads
+├─ projects
+├─ metadata
+└─ jobs</pre>
+    </section>
+
+    <section class="panel panel-top">
+      <span>JARVIS V2</span>
+      <span id="runtime-status">● LISTENING</span>
+      <span id="clock"></span>
+    </section>
+
+    <section class="panel central" id="central-terminal">
+      <canvas id="vrm-canvas" aria-label="JARVIS VRM avatar"></canvas>
+      <div class="hud hud-top">CENTRAL VRM / HEAD→WAIST / 4D</div>
+      <div class="hud hud-bottom">
+        <span id="avatar-state">IDLE</span>
+        <span id="voice-meter">VOICE 0%</span>
+      </div>
+      <div id="loading" class="loading hidden">INITIALIZING JARVIS…</div>
+    </section>
+
+    <section class="panel panel-right">
+      <header>SYSTEM MONITOR</header>
+      <div class="metric"><span>CPU</span><strong id="cpu">--</strong></div>
+      <div class="metric"><span>MEM</span><strong id="mem">--</strong></div>
+      <div class="metric"><span>BRIDGE</span><strong>CONNECTED</strong></div>
+      <div class="metric"><span>VRM</span><strong id="vrm-status">READY</strong></div>
+    </section>
+
+    <section class="panel panel-bottom-left">
+      <header>TERMINAL</header>
+      <pre id="terminal-log">JARVIS::BOOT
+UI shell online
+VRM renderer waiting for model…</pre>
+    </section>
+
+    <section class="panel panel-bottom-right">
+      <header>VOICE / JOBS</header>
+      <div>MIC: <strong id="mic-status">OFF</strong></div>
+      <div>LIP SYNC: <strong>ON</strong></div>
+      <div>APPROVAL: <strong>HUMAN GATE</strong></div>
+    </section>
+  </main>
+  <script type="module" src="./vrm_app.js"></script>
+</body>
+</html>
