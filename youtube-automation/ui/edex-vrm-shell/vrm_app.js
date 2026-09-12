@@ -13,6 +13,9 @@ const loading = document.querySelector('#loading');
 const micStatus = document.querySelector('#mic-status');
 const clock = document.querySelector('#clock');
 
+const BRIDGE_URL = String(document.body.dataset.bridgeUrl || 'http://127.0.0.1:8787').replace(/\/$/, '');
+const STATE_POLL_MS = 500;
+
 const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
@@ -40,7 +43,15 @@ scene.add(grid);
 
 let vrm = null;
 let blinkClock = 0;
-let currentState = { animation: 'idle', emotion: 'neutral', speaking: false, listening: false, mouth_open: 0, voice_level: 0 };
+let currentState = {
+  animation: 'idle',
+  emotion: 'neutral',
+  speaking: false,
+  listening: false,
+  locked: false,
+  mouth_open: 0,
+  voice_level: 0,
+};
 
 function log(line) {
   terminalLog.textContent += `\n${line}`;
@@ -96,6 +107,8 @@ function animateVRM(dt, elapsed) {
     vrm.scene.rotation.x = Math.sin(elapsed * 1.8) * 0.018;
   } else if (currentState.animation === 'think') {
     vrm.scene.rotation.x = -0.035 + Math.sin(elapsed * 0.9) * 0.01;
+  } else if (currentState.animation === 'alert') {
+    vrm.scene.rotation.x = Math.sin(elapsed * 9.0) * 0.008;
   } else {
     vrm.scene.rotation.x = 0;
   }
@@ -146,6 +159,34 @@ function handleMessage(event) {
   }
 }
 window.addEventListener('message', handleMessage);
+
+async function syncBridgeState() {
+  try {
+    const response = await fetch(`${BRIDGE_URL}/api/v1/ui/state`, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    applyState(payload.vrm || {});
+    loading.classList.toggle('hidden', !Boolean(payload.loading_visible));
+    window.postMessage({ type: 'jarvis-ui-state', payload }, '*');
+  } catch (error) {
+    log(`BRIDGE::OFFLINE ${error.message}`);
+  }
+}
+setInterval(syncBridgeState, STATE_POLL_MS);
+syncBridgeState();
+
+async function sendCommand(command) {
+  const response = await fetch(`${BRIDGE_URL}/api/v1/ui/command`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ command }),
+  });
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+  applyState(payload.ui?.vrm || {});
+  return payload;
+}
+window.JARVISCommand = sendCommand;
 
 async function enableMicrophone() {
   if (!navigator.mediaDevices?.getUserMedia) return;
