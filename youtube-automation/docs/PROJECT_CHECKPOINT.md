@@ -14,7 +14,7 @@ Do not switch this work to MYRA/V5 unless explicitly requested.
 
 Android App (paused) → YouTube Automation Bridge → workspace/uploads/jobs/metadata → JARVIS Core / Agents → media pipeline → YouTube Studio adapter
 
-The backend/core must remain alive independently of the voice/UI listening layer.
+The backend/core remains alive independently from the voice/UI listening layer.
 
 ## Song-to-YouTube pipeline
 
@@ -43,47 +43,49 @@ Shutdown/deactivation affects only the voice-listening/UI interaction layer. It 
 ## Implemented core files
 
 - `youtube-automation/core/song_factory.py`
+- `youtube-automation/core/pipeline_runner.py`
+- `youtube-automation/core/render_engine.py`
 - `youtube-automation/core/youtube_publish_flow.py`
 - `youtube-automation/core/voice_control.py`
 - `youtube-automation/core/voice_control_test.py`
-- `youtube-automation/core/voice_control_test.py`
 - `youtube-automation/core/speech_listener.py`
+- `youtube-automation/core/speech_listener_test.py`
 - `youtube-automation/core/runtime.py`
 - `youtube-automation/core/runtime_test.py`
+- `youtube-automation/core/runtime_cli.py`
 - `youtube-automation/core/__init__.py`
 - `youtube-automation/core/README.md`
 - `youtube-automation/core/VOICE_CONTROL.md`
 - `youtube-automation/core/RUNTIME.md`
 - `youtube-automation/core/requirements-voice.txt`
 
-## Runtime work already added
+## Runtime / microphone status
 
-The runtime layer connects the voice-control state machine with the listener/UI lifecycle. It is intended to provide:
+Live microphone capture is now implemented in `speech_listener.py` using lazy `sounddevice` capture, temporary WAV chunks, and local `faster-whisper` transcription. `runtime.py` owns the microphone thread and keeps the backend alive when listening is disabled.
 
-- backend lifecycle independent from listener state
-- listener start/stop handling
-- runtime status reporting
-- UI state callback integration
-- command routing through `VoiceControl`
-- demo/testable state transitions
+Hardware-free tests cover the runtime state machine, microphone thread lifecycle, and one captured/transcribed microphone chunk. `runtime_cli.py` provides a small command-line smoke/demo entry point.
 
-## Important implementation note
+The microphone stack remains optional: the core runtime can start without `sounddevice`/`faster-whisper`; live capture reports a dependency error only when explicitly started.
 
-The current speech listener supports recognized text and audio-file transcription, but live microphone capture must be treated as unfinished until the actual `sounddevice` capture loop is implemented and tested.
+## Bridge / media pipeline status
 
-`sounddevice` is declared in `requirements-voice.txt` but is not by itself proof that live microphone capture is complete.
+The local Bridge exposes health, authenticated file upload/list/download, asynchronous job creation/status, and approval-gated song jobs. The pipeline runner already connects song project creation → FFmpeg render → metadata → thumbnail → `awaiting_approval` manifest state.
 
-## Next execution order
+The current FFmpeg renderer is an MVP adapter: it produces a 1920×1080 H.264/AAC video with a mood-dependent cinematic background, subtle zoom and vignette. It is intentionally a replaceable rendering layer for the future 3D/VRM scene renderer.
 
-1. Fix/package-safe imports in `speech_listener.py`.
-2. Implement real live microphone capture with `sounddevice` + temporary WAV chunks + faster-whisper transcription.
-3. Wire the capture loop into `runtime.py` without stopping the backend when listening is disabled.
-4. Add runtime/microphone tests and a CLI demo.
-5. Add the UI listening/locked status indicator.
-6. Build the FFmpeg-based rendering MVP for the song factory.
-7. Audit the uploaded source-library projects and extract only useful modules.
-8. Implement the YouTube Studio adapter separately from the core state machine.
-9. Keep final publishing behind the approval gate.
+## Remaining execution order
+
+1. Run/verify the Python tests and CI path on the repository environment.
+2. Harden Bridge API tests and job/approval state handling.
+3. Add the UI listening/locked status adapter while preserving the locked eDEX-UI visual foundation.
+4. Replace/extend the FFmpeg MVP with the real song-driven 3D/VRM scene pipeline once the exact UI/visual source is available.
+5. Audit the uploaded source-library projects and extract only useful modules.
+6. Implement the YouTube Studio adapter separately from the core state machine.
+7. Keep final publishing behind the approval gate.
+
+## UI lock
+
+`youtube-automation/docs/JARVIS_V2_UI_LOCK.md` is the visual source-of-truth constraint. Preserve the selected eDEX-UI shell, loading screens, transitions, effects, panels, terminal/HUD language and overall composition. The intended central visual replacement is the head-to-waist animated VRM/3D character; do not redesign the surrounding shell.
 
 ## Source library
 
