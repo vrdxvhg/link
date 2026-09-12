@@ -11,6 +11,13 @@ try:
 except ImportError:
     from jobs import create_job, get_job, update_job
     from worker import submit_job
+try:
+    from ..core.ui_runtime import JARVISUIRuntime
+except ImportError:
+    try:
+        from youtube_automation.core.ui_runtime import JARVISUIRuntime
+    except ImportError:
+        JARVISUIRuntime = None
 
 MAX_UPLOAD_BYTES = int(os.getenv("JARVIS_MAX_UPLOAD_BYTES", str(2 * 1024 * 1024 * 1024)))
 WORKSPACE = Path(os.getenv("JARVIS_WORKSPACE", "workspace/uploads")).resolve()
@@ -19,6 +26,7 @@ NAME_RE = re.compile(r"[^A-Za-z0-9._ -]")
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
 WORKSPACE.mkdir(parents=True, exist_ok=True)
+UI_RUNTIME = JARVISUIRuntime() if JARVISUIRuntime is not None else None
 
 
 def authorized() -> bool:
@@ -48,6 +56,28 @@ def auth_gate():
 @app.get("/health")
 def health():
     return jsonify({"ok": True, "service": "jarvis-v2-bridge", "workspace": str(WORKSPACE)})
+
+
+@app.get("/api/v1/ui/state")
+def ui_state():
+    if UI_RUNTIME is None:
+        return jsonify({"error": "ui runtime unavailable"}), 503
+    return jsonify(UI_RUNTIME.status())
+
+
+@app.post("/api/v1/ui/command")
+def ui_command():
+    if UI_RUNTIME is None:
+        return jsonify({"error": "ui runtime unavailable"}), 503
+    data = request.get_json(silent=True) or {}
+    command = str(data.get("command", "")).strip()
+    if not command:
+        return jsonify({"error": "command is required"}), 400
+    try:
+        state = UI_RUNTIME.command(command)
+        return jsonify({"state": state, "ui": UI_RUNTIME.status()})
+    except Exception as exc:
+        return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 400
 
 
 @app.post("/api/v1/files/upload")
