@@ -9,8 +9,12 @@ from dataclasses import dataclass, field
 import threading
 from typing import Callable, Optional
 
-from .voice_control import ListenerState, VoiceControl
-from .speech_listener import ListenerConfig, SpeechListener
+try:
+    from .voice_control import ListenerState, VoiceControl
+    from .speech_listener import ListenerConfig, SpeechListener
+except ImportError:  # Allow direct execution from the core directory.
+    from voice_control import ListenerState, VoiceControl
+    from speech_listener import ListenerConfig, SpeechListener
 
 
 @dataclass
@@ -54,10 +58,8 @@ class JarvisRuntime:
         return self.listener.process_audio_file(path)
 
     def start_microphone(self) -> None:
-        """Start the optional microphone capture loop without blocking the backend."""
-        if self.microphone_running:
-            return
-        if not self.listening:
+        """Start optional microphone capture without blocking backend services."""
+        if self.microphone_running or not self.listening:
             return
         self.listener._stop_requested = False
         self._mic_thread = threading.Thread(
