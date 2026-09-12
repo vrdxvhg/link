@@ -59,6 +59,8 @@ Shutdown/deactivation affects only the voice-listening/UI interaction layer. It 
 - `youtube-automation/core/approval_gate.py`
 - `youtube-automation/core/youtube_adapter.py`
 - `youtube-automation/core/youtube_browser_adapter.py`
+- `youtube-automation/core/vrm_controller.py`
+- `youtube-automation/core/vrm_controller_test.py`
 - `youtube-automation/core/__init__.py`
 - `youtube-automation/core/README.md`
 - `youtube-automation/core/VOICE_CONTROL.md`
@@ -81,12 +83,27 @@ The current FFmpeg renderer is an MVP adapter: it produces a 1920×1080 H.264/AA
 
 The YouTube Studio layer already has a core publish state machine plus browser-adapter contract/dry-run implementation. A production browser driver still needs live Studio verification.
 
+## 4D VRM UI milestone
+
+The eDEX-UI shell remains locked. The central terminal/main display region is reserved for the animated **head-to-waist 4D VRM avatar**; the surrounding panels, loading screens, transitions, effects, terminal/HUD language and overall composition are not to be redesigned.
+
+`youtube-automation/core/vrm_controller.py` now provides a render-neutral adapter boundary with:
+
+- head-to-waist framing
+- listening / speaking / idle / thinking / alert animation states
+- emotion state
+- live voice level
+- mouth-open intensity for lip-sync
+- locked/listening state
+
+`vrm_controller_test.py` covers runtime mapping, voice-level normalization, speaking transitions and lip-sync mouth reset. The final desktop renderer still needs to connect these states to the actual eDEX visual layer and production VRM runtime.
+
 ## Remaining execution order
 
 1. Verify the latest CI run and fix any environment/import failures.
 2. Harden Bridge API/job tests and approval-state transitions.
-3. Add the UI listening/locked status adapter while preserving the locked eDEX-UI visual foundation.
-4. Replace/extend the FFmpeg MVP with the real song-driven 3D/VRM scene pipeline once the exact UI/visual source is available.
+3. Connect runtime voice/listening state to the new VRM controller and locked eDEX UI shell.
+4. Replace/extend the FFmpeg MVP with the real song-driven 3D/VRM scene pipeline.
 5. Audit the uploaded source-library projects and extract only useful modules.
 6. Verify/attach the production YouTube Studio browser driver against the live Studio UI.
 7. Keep final publishing behind the approval gate.
