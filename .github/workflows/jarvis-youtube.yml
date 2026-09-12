@@ -30,6 +30,11 @@ jobs:
           python speech_listener_test.py
           python ui_runtime_test.py
           python runtime_cli.py "I am Vikas" "lock" "I am Vikas"
+      - name: Run media pipeline tests
+        working-directory: youtube-automation/core
+        run: |
+          python shorts_media_adapters_test.py
+          python render_engine_test.py
       - name: Run bridge UI contract tests
         working-directory: youtube-automation
         run: python -m pytest -q bridge/ui_route_test.py
