@@ -22,6 +22,11 @@ except ImportError:
 MAX_UPLOAD_BYTES = int(os.getenv("JARVIS_MAX_UPLOAD_BYTES", str(2 * 1024 * 1024 * 1024)))
 WORKSPACE = Path(os.getenv("JARVIS_WORKSPACE", "workspace/uploads")).resolve()
 TOKEN = os.getenv("JARVIS_BRIDGE_TOKEN", "")
+CORS_ORIGINS = {
+    origin.strip()
+    for origin in os.getenv("JARVIS_CORS_ORIGINS", "http://127.0.0.1:8000,http://localhost:8000").split(",")
+    if origin.strip()
+}
 NAME_RE = re.compile(r"[^A-Za-z0-9._ -]")
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
@@ -44,8 +49,22 @@ def files() -> list[Path]:
     return sorted((p for p in WORKSPACE.iterdir() if p.is_file()), key=lambda p: p.name.lower())
 
 
+@app.after_request
+def add_cors_headers(response):
+    """Allow the local eDEX shell to call the bridge from its preview origin."""
+    origin = request.headers.get("Origin")
+    if origin and origin in CORS_ORIGINS:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Vary"] = "Origin"
+        response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    return response
+
+
 @app.before_request
 def auth_gate():
+    if request.method == "OPTIONS":
+        return None
     if request.path == "/health":
         return None
     if not authorized():
@@ -53,20 +72,24 @@ def auth_gate():
     return None
 
 
-@app.get("/health")
+@app.route("/health", methods=["GET", "OPTIONS"])
 def health():
     return jsonify({"ok": True, "service": "jarvis-v2-bridge", "workspace": str(WORKSPACE)})
 
 
-@app.get("/api/v1/ui/state")
+@app.route("/api/v1/ui/state", methods=["GET", "OPTIONS"])
 def ui_state():
+    if request.method == "OPTIONS":
+        return ("", 204)
     if UI_RUNTIME is None:
         return jsonify({"error": "ui runtime unavailable"}), 503
     return jsonify(UI_RUNTIME.status())
 
 
-@app.post("/api/v1/ui/command")
+@app.route("/api/v1/ui/command", methods=["POST", "OPTIONS"])
 def ui_command():
+    if request.method == "OPTIONS":
+        return ("", 204)
     if UI_RUNTIME is None:
         return jsonify({"error": "ui runtime unavailable"}), 503
     data = request.get_json(silent=True) or {}
