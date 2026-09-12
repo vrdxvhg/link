@@ -14,6 +14,7 @@ const micStatus = document.querySelector('#mic-status');
 const clock = document.querySelector('#clock');
 
 const BRIDGE_URL = String(document.body.dataset.bridgeUrl || 'http://127.0.0.1:8787').replace(/\/$/, '');
+const VRM_URL = String(document.body.dataset.vrmUrl || '../../assets/jarvis.vrm');
 const STATE_POLL_MS = 500;
 
 const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
@@ -68,16 +69,6 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-function applyState(next) {
-  currentState = { ...currentState, ...next };
-  const readable = String(currentState.animation || 'idle').toUpperCase();
-  stateLabel.textContent = readable;
-  const level = Math.round(Math.max(0, Math.min(1, Number(currentState.voice_level || 0))) * 100);
-  voiceMeter.textContent = `VOICE ${level}%`;
-  runtimeStatus.textContent = currentState.listening ? '● LISTENING' : '○ INACTIVE';
-  if (currentState.locked) runtimeStatus.textContent = '◈ LOCKED';
-}
-
 function setMorph(name, value) {
   if (!vrm?.expressionManager) return;
   const aliases = {
@@ -91,6 +82,16 @@ function setMorph(name, value) {
   for (const alias of aliases[name] || []) {
     try { vrm.expressionManager.setValue(alias, value); } catch (_) { /* model may not contain expression */ }
   }
+}
+
+function applyState(next) {
+  currentState = { ...currentState, ...next };
+  const readable = String(currentState.animation || 'idle').toUpperCase();
+  stateLabel.textContent = readable;
+  const level = Math.round(Math.max(0, Math.min(1, Number(currentState.voice_level || 0))) * 100);
+  voiceMeter.textContent = `VOICE ${level}%`;
+  runtimeStatus.textContent = currentState.listening ? '● LISTENING' : '○ INACTIVE';
+  if (currentState.locked) runtimeStatus.textContent = '◈ LOCKED';
 }
 
 function animateVRM(dt, elapsed) {
@@ -126,7 +127,7 @@ function animateVRM(dt, elapsed) {
   setMorph('surprised', currentState.emotion === 'surprised' ? 0.8 : 0);
 }
 
-async function loadVRM(url = '../../assets/jarvis.vrm') {
+async function loadVRM(url = VRM_URL) {
   loading.classList.remove('hidden');
   vrmStatus.textContent = 'LOADING';
   const loader = new GLTFLoader();
@@ -215,21 +216,24 @@ async function enableMicrophone() {
   }
 }
 
+document.addEventListener('click', () => {
+  if (micStatus.textContent === 'OFF') enableMicrophone();
+}, { once: true });
+
 const clockLoop = () => {
   clock.textContent = new Date().toLocaleTimeString();
   requestAnimationFrame(clockLoop);
 };
 clockLoop();
 
-loadVRM();
-enableMicrophone();
-
-const timer = new THREE.Clock();
-function render() {
-  const dt = timer.getDelta();
-  const elapsed = timer.elapsedTime;
-  animateVRM(dt, elapsed);
+const rendererLoop = () => {
+  requestAnimationFrame(rendererLoop);
+  const now = performance.now() / 1000;
+  const previous = rendererLoop.previous ?? now;
+  const dt = Math.min(0.1, now - previous);
+  rendererLoop.previous = now;
+  animateVRM(dt, now);
   renderer.render(scene, camera);
-  requestAnimationFrame(render);
-}
-render();
+};
+rendererLoop();
+loadVRM();
