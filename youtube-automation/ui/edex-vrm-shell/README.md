@@ -1,42 +1,43 @@
-# JARVIS V2 — eDEX + 4D VRM shell prototype
+# JARVIS V2 — eDEX + 4D VRM shell
 
-This folder is the desktop renderer surface for the locked eDEX-UI foundation.
+This folder is the desktop presentation surface for the locked eDEX-UI foundation.
 
-## Locked visual rule
+## Visual lock
 
-The surrounding eDEX-style shell is preserved. The center terminal/workspace is the only intended visual replacement: it hosts a head-to-waist VRM avatar. Loading, panels, HUD/technical composition and runtime status remain part of the shell.
+The surrounding eDEX shell is not redesigned. Loading behavior, panels, terminal/HUD language and technical composition remain intact.
 
-## Renderer
+The central terminal/workspace is the only replacement surface: a head-to-waist animated VRM character.
 
-`vrm_app.js` uses Three.js + `@pixiv/three-vrm` and expects the model at:
+## Runtime behavior
+
+The browser renderer consumes `jarvis-ui-state` `postMessage` payloads from the JARVIS UI runtime bridge. The VRM presentation supports idle, listening, speaking and thinking motion, simple emotion expressions, blinking and voice-level-driven mouth movement.
+
+The canonical runtime remains in `youtube-automation/core`. Browser microphone RMS is only a local visual fallback; it is not the authoritative voice state.
+
+## Model
+
+Place the user's final VRM model at:
 
 `youtube-automation/assets/jarvis.vrm`
 
-The model is intentionally an external asset and is not fabricated by this prototype.
-
-## Runtime state
-
-The renderer accepts `postMessage` events shaped as:
-
-```js
-window.postMessage({
-  type: "jarvis-ui-state",
-  payload: {
-    loading_visible: false,
-    vrm: {
-      animation: "speak",
-      emotion: "confident",
-      speaking: true,
-      listening: false,
-      mouth_open: 0.72,
-      voice_level: 0.55
-    }
-  }
-});
-```
-
-The microphone meter uses Web Audio RMS as a local fallback. The canonical JARVIS runtime remains the source of truth; this browser-side meter is only a presentation aid.
+The repository does not invent or fabricate the character asset.
 
 ## Local preview
 
-Serve the repository from a local HTTP server so ES modules and `.vrm` assets load correctly. Do not open `index.html` directly from `file://`.
+From the repository root:
+
+```text
+python youtube-automation/ui/edex-vrm-shell/serve_ui.py --port 4173
+```
+
+Then open:
+
+`http://127.0.0.1:4173/index.html`
+
+Use an HTTP server rather than `file://` so ES modules and VRM assets load correctly.
+
+## Integration path
+
+`JarvisRuntime -> JARVISUIRuntime -> EDEXUIStateBridge -> postMessage -> edex_vrm_bridge.js -> vrm_app.js`
+
+This keeps the UI renderer replaceable without coupling core job/voice logic to DOM selectors.
