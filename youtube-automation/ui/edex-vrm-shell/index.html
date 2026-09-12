@@ -23,7 +23,7 @@
       <span id="clock"></span>
     </section>
 
-    <section class="panel central" id="central-terminal">
+    <section class="panel central" id="central-terminal" data-central-module="vrm" data-framing="head_to_waist">
       <canvas id="vrm-canvas" aria-label="JARVIS VRM avatar"></canvas>
       <div class="hud hud-top">CENTRAL VRM / HEAD→WAIST / 4D</div>
       <div class="hud hud-bottom">
@@ -55,6 +55,10 @@ VRM renderer waiting for model…</pre>
       <div>APPROVAL: <strong>HUMAN GATE</strong></div>
     </section>
   </main>
-  <script type="module" src="./vrm_app.js"></script>
+  <script type="module">
+    import { createEDEXVRMBridge } from './edex_vrm_bridge.js';
+    createEDEXVRMBridge();
+    import './vrm_app.js';
+  </script>
 </body>
 </html>
