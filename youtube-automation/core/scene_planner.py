@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from typing import Any
 
 
@@ -16,11 +16,30 @@ class Scene:
     beat_sync: bool = True
 
 
-def build_scene_plan(duration_seconds: float, bpm: float = 120.0, mood: str = "cinematic") -> dict[str, Any]:
-    """Create a deterministic first-pass storyboard without rendering anything."""
-    beat = 60.0 / max(bpm, 1.0)
+def build_beat_timeline(duration_seconds: float, bpm: float = 120.0) -> list[float]:
+    """Return beat timestamps from zero through the final beat inside the audio."""
+    if duration_seconds <= 0:
+        raise ValueError("duration_seconds must be greater than zero")
+    if bpm <= 0:
+        raise ValueError("bpm must be greater than zero")
+
+    beat = 60.0 / bpm
+    count = int((duration_seconds - 1e-9) / beat) + 1
+    return [round(index * beat, 6) for index in range(count)]
+
+
+def build_scene_plan(
+    duration_seconds: float, bpm: float = 120.0, mood: str = "cinematic"
+) -> dict[str, Any]:
+    """Create a deterministic first-pass storyboard aligned to eight-beat blocks."""
+    if duration_seconds <= 0:
+        raise ValueError("duration_seconds must be greater than zero")
+    if bpm <= 0:
+        raise ValueError("bpm must be greater than zero")
+
+    beat = 60.0 / bpm
     block = beat * 8.0
-    count = max(1, int((duration_seconds + block - 0.001) // block))
+    count = max(1, int((duration_seconds + block - 1e-9) // block))
     scenes: list[Scene] = []
     styles = {
         "romantic": "cinematic_romance",
@@ -32,7 +51,22 @@ def build_scene_plan(duration_seconds: float, bpm: float = 120.0, mood: str = "c
     }
     style = styles.get(mood.lower(), "cinematic_3d")
     for index in range(count):
-        start = index * block
+        start = min(duration_seconds, index * block)
         end = min(duration_seconds, start + block)
+        if end <= start:
+            continue
         scenes.append(Scene(index + 1, start, end, style, "beat_cut"))
-    return {"version": "1.0", "duration_seconds": duration_seconds, "bpm": bpm, "mood": mood, "scenes": [asdict(s) for s in scenes]}
+
+    # Keep the final scene boundary exactly equal to the media duration.
+    if scenes:
+        scenes[-1].end_seconds = duration_seconds
+
+    return {
+        "version": "1.1",
+        "duration_seconds": duration_seconds,
+        "bpm": bpm,
+        "mood": mood,
+        "beat_seconds": beat,
+        "beat_timeline": build_beat_timeline(duration_seconds, bpm),
+        "scenes": [asdict(scene) for scene in scenes],
+    }
