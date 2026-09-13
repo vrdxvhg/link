@@ -6,14 +6,18 @@ import json
 import subprocess
 from pathlib import Path
 
+from .malware_analysis import analyze_file, save_report
+
 ROOT = Path(__file__).resolve().parent
 LOG = ROOT / "logs" / "security_center.log"
+REPORTS = ROOT / "security_reports"
 
 BLOCKED = (
     "format ", "diskpart", "cipher /w", "del /s", "rd /s", "rmdir /s",
     "shutdown", "reg delete", "schtasks /create", "net user", "mimikatz",
     "powershell -enc", "invoke-expression", "iex ", "downloadstring",
 )
+
 
 class SecurityCenter:
     """Local defensive Security Center automation facade."""
@@ -68,8 +72,22 @@ class SecurityCenter:
             return 2, "", f"No predefined defensive inventory for: {area}"
         return self.run_local_command(command)
 
+    def analyze_sample(self, path: str, report_path: str | None = None) -> dict:
+        """Perform static-only analysis; the sample is never executed."""
+        self._log("malware_static_analysis", path=path, executed=False)
+        report = analyze_file(path)
+        if report_path:
+            destination = save_report(report, report_path)
+            report["report_path"] = str(destination)
+        return report
+
     def status(self) -> dict[str, str]:
-        return {"module": "JARVIS Security Center", "status": "ready", "scope": "local/authorized"}
+        return {
+            "module": "JARVIS Security Center",
+            "status": "ready",
+            "scope": "local/authorized",
+            "malware_analysis": "static-only",
+        }
 
     def route_voice_command(self, text: str) -> tuple[bool, str]:
         """Handle safe Security Center voice commands."""
@@ -88,6 +106,25 @@ class SecurityCenter:
                 area = raw[len(prefix):].strip()
                 code, out, err = self.defensive_inventory(area)
                 return True, (out or err or f"scan exited with code {code}").strip()
+
+        analysis_prefixes = (
+            "analyze malware ", "analyze sample ", "malware analysis ",
+            "मैलवेयर एनालिसिस ", "सैंपल एनालाइज ",
+        )
+        for prefix in analysis_prefixes:
+            if command.startswith(prefix):
+                path = raw[len(prefix):].strip().strip('"')
+                try:
+                    report = self.analyze_sample(path)
+                    return True, json.dumps({
+                        "name": report["name"],
+                        "sha256": report["sha256"],
+                        "size": report["size"],
+                        "entropy": report["sample_entropy"],
+                        "executed": False,
+                    }, ensure_ascii=False)
+                except (FileNotFoundError, ValueError) as exc:
+                    return True, f"Static analysis error: {exc}"
 
         prefixes = (
             "security command ", "run security command ", "सिक्योरिटी कमांड चलाओ ",
