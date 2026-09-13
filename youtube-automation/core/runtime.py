@@ -1,8 +1,4 @@
-"""JARVIS V2 runtime coordinator for voice activation and UI state.
-
-The runtime keeps the backend alive while the interaction layer is inactive.
-A UI can subscribe to state changes without knowing anything about speech recognition.
-"""
+"""JARVIS V2 runtime coordinator for voice activation, UI state and Security Center."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -12,9 +8,11 @@ from typing import Callable, Optional
 try:
     from .voice_control import ListenerState, VoiceControl
     from .speech_listener import ListenerConfig, SpeechListener
-except ImportError:  # Allow direct execution from the core directory.
+    from .security import SecurityCenter
+except ImportError:
     from voice_control import ListenerState, VoiceControl
     from speech_listener import ListenerConfig, SpeechListener
+    from security.security_center import SecurityCenter
 
 
 @dataclass
@@ -22,14 +20,16 @@ class JarvisRuntime:
     controller: VoiceControl = field(default_factory=VoiceControl)
     on_ui_state: Optional[Callable[[str], None]] = None
     on_transcript: Optional[Callable[[str], None]] = None
+    on_security_output: Optional[Callable[[str], None]] = None
 
     def __post_init__(self) -> None:
         self.listener = SpeechListener(
             controller=self.controller,
             config=ListenerConfig(),
             on_state_change=self._state_changed,
-            on_transcript=self.on_transcript,
+            on_transcript=self._transcript_received,
         )
+        self.security = SecurityCenter()
         self._mic_thread: Optional[threading.Thread] = None
 
     @property
@@ -44,8 +44,21 @@ class JarvisRuntime:
         if self.on_ui_state:
             self.on_ui_state(state)
 
+    def _transcript_received(self, text: str) -> None:
+        if self.on_transcript:
+            self.on_transcript(text)
+        handled, output = self.security.route_voice_command(text)
+        if handled and self.on_security_output:
+            self.on_security_output(output)
+
     def command(self, text: str) -> str:
-        """Route recognized text into the voice-control state machine."""
+        """Route text through Security Center first, then voice state control."""
+        handled, output = self.security.route_voice_command(text)
+        if handled:
+            if self.on_security_output:
+                self.on_security_output(output)
+            return self.controller.state.value
+
         state = self.listener.process_text(text)
         if self.listening and not self.microphone_running:
             self.start_microphone()
@@ -84,11 +97,15 @@ class JarvisRuntime:
             "microphone_running": self.microphone_running,
             "locked": self.controller.locked,
             "state": self.controller.state.value,
+            "security_center": self.security.status()["status"],
         }
 
 
 if __name__ == "__main__":
-    runtime = JarvisRuntime(on_ui_state=lambda state: print(f"UI: {state}"))
+    runtime = JarvisRuntime(
+        on_ui_state=lambda state: print(f"UI: {state}"),
+        on_security_output=lambda output: print(f"SECURITY: {output}"),
+    )
     print(runtime.status())
     import sys
     for command in sys.argv[1:]:
