@@ -1,9 +1,4 @@
-"""JARVIS V2 Security Center command/terminal automation.
-
-This layer is intentionally limited to local, user-supplied, defensive
-commands. It provides a bridge for the existing JARVIS voice runtime without
-embedding offensive tooling or unauthorized-access automation.
-"""
+"""JARVIS V2 Security Center defensive automation facade."""
 from __future__ import annotations
 
 import datetime as dt
@@ -14,9 +9,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 LOG = ROOT / "logs" / "security_center.log"
 
-# Refuse common destructive, credential-theft, persistence, and encoded-payload
-# patterns in the voice automation layer. Approved security tools can later be
-# wrapped behind explicit scope/approval checks.
 BLOCKED = (
     "format ", "diskpart", "cipher /w", "del /s", "rd /s", "rmdir /s",
     "shutdown", "reg delete", "schtasks /create", "net user", "mimikatz",
@@ -24,7 +16,7 @@ BLOCKED = (
 )
 
 class SecurityCenter:
-    """Local Security Center automation facade."""
+    """Local defensive Security Center automation facade."""
 
     def _log(self, action: str, **data: object) -> None:
         LOG.parent.mkdir(parents=True, exist_ok=True)
@@ -36,7 +28,7 @@ class SecurityCenter:
             }, ensure_ascii=False) + "\n")
 
     def open_terminal(self) -> str:
-        """Open a normal local PowerShell window rooted at the project."""
+        """Open a normal local PowerShell window rooted at JARVIS."""
         subprocess.Popen(
             ["powershell.exe", "-NoExit"],
             cwd=str(ROOT.parent.parent),
@@ -46,7 +38,7 @@ class SecurityCenter:
         return "Security terminal opened"
 
     def run_local_command(self, command: str) -> tuple[int, str, str]:
-        """Run an explicitly supplied local PowerShell command."""
+        """Run an explicitly supplied local PowerShell command after policy checks."""
         command = command.strip()
         if not command:
             return 2, "", "No command supplied"
@@ -54,7 +46,6 @@ class SecurityCenter:
         if any(token in lowered for token in BLOCKED):
             self._log("blocked_command", command=command)
             return 3, "", "Command blocked by Security Center safety policy"
-
         self._log("run_command", command=command)
         result = subprocess.run(
             ["powershell.exe", "-NoProfile", "-Command", command],
@@ -62,25 +53,48 @@ class SecurityCenter:
         )
         return result.returncode, result.stdout, result.stderr
 
+    def defensive_inventory(self, area: str) -> tuple[int, str, str]:
+        """Run a predefined read-only local inventory for a Security Center area."""
+        commands = {
+            "network scanner": "Get-NetIPConfiguration | Format-List",
+            "windows security": "Get-CimInstance Win32_OperatingSystem | Select-Object Caption,Version,BuildNumber",
+            "linux security": "if (Get-Command wsl -ErrorAction SilentlyContinue) { wsl uname -a } else { 'WSL not installed' }",
+            "log / soc monitor": "Get-WinEvent -ListLog * -ErrorAction SilentlyContinue | Select-Object -First 25 LogName,RecordCount,IsEnabled",
+            "process inventory": "Get-Process | Sort-Object CPU -Descending | Select-Object -First 25 Name,Id,CPU",
+            "service inventory": "Get-Service | Sort-Object Status,Name | Select-Object -First 50 Status,Name,DisplayName",
+        }
+        command = commands.get(area.lower())
+        if not command:
+            return 2, "", f"No predefined defensive inventory for: {area}"
+        return self.run_local_command(command)
+
     def status(self) -> dict[str, str]:
         return {"module": "JARVIS Security Center", "status": "ready", "scope": "local/authorized"}
 
     def route_voice_command(self, text: str) -> tuple[bool, str]:
-        """Handle a small safe command vocabulary from JARVIS voice input."""
-        command = " ".join((text or "").lower().strip().split())
+        """Handle safe Security Center voice commands."""
+        raw = (text or "").strip()
+        command = " ".join(raw.lower().split())
         if command in {"open security terminal", "security terminal kholo", "सिक्योरिटी टर्मिनल खोलो"}:
             return True, self.open_terminal()
         if command in {"security status", "सिक्योरिटी स्टेटस"}:
             return True, json.dumps(self.status(), ensure_ascii=False)
 
+        inventory_prefixes = (
+            "security scan ", "run security scan ", "सिक्योरिटी स्कैन ",
+        )
+        for prefix in inventory_prefixes:
+            if command.startswith(prefix):
+                area = raw[len(prefix):].strip()
+                code, out, err = self.defensive_inventory(area)
+                return True, (out or err or f"scan exited with code {code}").strip()
+
         prefixes = (
-            "security command ",
-            "run security command ",
-            "सिक्योरिटी कमांड चलाओ ",
+            "security command ", "run security command ", "सिक्योरिटी कमांड चलाओ ",
         )
         for prefix in prefixes:
             if command.startswith(prefix):
-                raw = text.strip()[len(prefix):].strip()
-                code, out, err = self.run_local_command(raw)
+                raw_command = raw[len(prefix):].strip()
+                code, out, err = self.run_local_command(raw_command)
                 return True, (out or err or f"command exited with code {code}").strip()
         return False, ""
